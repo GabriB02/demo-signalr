@@ -1,9 +1,6 @@
 ﻿using ChatService.Models;
 using Microsoft.AspNetCore.SignalR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace ChatService.Hubs
 {
@@ -12,12 +9,13 @@ namespace ChatService.Hubs
         private readonly string _botUser;
         private readonly IDictionary<string, UserConnection> _connections;
         private static List<Message> _messages = new List<Message>();
-        public ChatHub(IDictionary<string, UserConnection> connections, IHubContext<ChatHub> hubContext)
+
+        public ChatHub(IDictionary<string, UserConnection> connections)
         {
             _botUser = "MyChat Bot";
             _connections = connections;
         }
-
+        //connection on o standardizzare cosa si manda come payload o cambiare il nome del metodo di ritorno in base a cosa si richiede
         public override Task OnDisconnectedAsync(Exception exception)
         {
             if (_connections.TryGetValue(Context.ConnectionId, out UserConnection userConnection))
@@ -32,16 +30,17 @@ namespace ChatService.Hubs
 
         public async Task SendMessage(string message)
         {     
-            if (_connections.TryGetValue(Context.ConnectionId, out UserConnection userConnection))
+            if (_connections.TryGetValue(Context.ConnectionId, out UserConnection? userConnection))
             {
                 Message newMessage = new Message();
                 newMessage._Id = _messages.Count;
+                newMessage._Sender = userConnection.User;
                 newMessage._Content = message;
-                newMessage.isRead = false;
+                newMessage._isRead = false;
                 _messages.Add(newMessage);
 
                 await Clients.Group(userConnection.Room)
-                   .SendAsync("ReceiveMessage", userConnection.User, newMessage);
+                   .SendAsync("ReceiveMessage", JsonConvert.SerializeObject(newMessage));
             }
         }
 
@@ -66,8 +65,8 @@ namespace ChatService.Hubs
 
         public async Task<Task> MarkMessageAsRead(int id)
         {
-            var messageToRead = _messages.Find(x => x._Id == id && !x.isRead);
-            messageToRead.isRead = true;
+            var messageToRead = _messages.Find(x => x._Id == id && !x._isRead);
+            messageToRead._isRead = true;
 
             return Clients.All.SendAsync("MessageRead", messageToRead);
         }

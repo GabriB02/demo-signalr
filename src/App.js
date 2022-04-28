@@ -21,9 +21,10 @@ const App = () => {
         setUsers(users);
       });
 
-      connection.on('ReceiveMessage', (user, message) => {
-        setMessages((messages) => [...messages, { user, message }]);
-        console.log('message received: ', message);
+      //connection on o standardizzare cosa si manda come payload o cambiare il nome del metodo di ritorno in base a cosa si richiede
+      connection.on('ReceiveMessage', (messageJson) => {
+        setMessages((messages) => [...messages, { ...messageJson }]);
+        console.log('message received: ', messageJson);
       });
 
       connection.onclose((e) => {
