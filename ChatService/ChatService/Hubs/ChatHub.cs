@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using ChatService.Models;
+using Microsoft.AspNetCore.SignalR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,8 @@ namespace ChatService.Hubs
     {
         private readonly string _botUser;
         private readonly IDictionary<string, UserConnection> _connections;
-
-        public ChatHub(IDictionary<string, UserConnection> connections)
+        private static List<Message> _messages = new List<Message>();
+        public ChatHub(IDictionary<string, UserConnection> connections, IHubContext<ChatHub> hubContext)
         {
             _botUser = "MyChat Bot";
             _connections = connections;
@@ -30,11 +31,17 @@ namespace ChatService.Hubs
         }
 
         public async Task SendMessage(string message)
-        {
+        {     
             if (_connections.TryGetValue(Context.ConnectionId, out UserConnection userConnection))
             {
+                Message newMessage = new Message();
+                newMessage._Id = _messages.Count;
+                newMessage._Content = message;
+                newMessage.isRead = false;
+                _messages.Add(newMessage);
+
                 await Clients.Group(userConnection.Room)
-                    .SendAsync("ReceiveMessage",userConnection.User, message);
+                   .SendAsync("ReceiveMessage", userConnection.User, newMessage);
             }
         }
 
@@ -55,6 +62,14 @@ namespace ChatService.Hubs
                 .Where(x => x.Room == room)
                 .Select(x => x.User);
             return Clients.Group(room).SendAsync("UsersInRoom", users);
+        }
+
+        public async Task<Task> MarkMessageAsRead(int id)
+        {
+            var messageToRead = _messages.Find(x => x._Id == id && !x.isRead);
+            messageToRead.isRead = true;
+
+            return Clients.All.SendAsync("MessageRead", messageToRead);
         }
     }
 }
