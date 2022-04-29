@@ -21,26 +21,36 @@ namespace ChatService.Hubs
             if (_connections.TryGetValue(Context.ConnectionId, out UserConnection userConnection))
             {
                 _connections.Remove(Context.ConnectionId);
+
+                Message disconnectMessage = new Message();
+                disconnectMessage._Id = _messages.Count;
+                disconnectMessage._Type = "info";
+                disconnectMessage._Sender = _botUser;
+                disconnectMessage._Content = $"{userConnection.User} has left {userConnection.Room}";
+                disconnectMessage._isRead = false;
+                _messages.Add(disconnectMessage);
+
                 Clients.Group(userConnection.Room)
-                    .SendAsync("ReceiveMessage", _botUser, $"{userConnection.User} has left {userConnection.Room}");
+                    .SendAsync("ReceiveMessage", disconnectMessage);
                 SendConnectedUsers(userConnection.Room);
             }
             return base.OnDisconnectedAsync(exception);
         }
 
         public async Task SendMessage(string message)
-        {     
+        {
             if (_connections.TryGetValue(Context.ConnectionId, out UserConnection? userConnection))
             {
                 Message newMessage = new Message();
                 newMessage._Id = _messages.Count;
+                newMessage._Type = "normal";
                 newMessage._Sender = userConnection.User;
                 newMessage._Content = message;
                 newMessage._isRead = false;
                 _messages.Add(newMessage);
 
                 await Clients.Group(userConnection.Room)
-                   .SendAsync("ReceiveMessage", JsonConvert.SerializeObject(newMessage));
+                   .SendAsync("ReceiveMessage", newMessage);
             }
         }
 
@@ -50,12 +60,20 @@ namespace ChatService.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, userConnection.Room);
             _connections[Context.ConnectionId] = userConnection;
 
-            await Clients.Group(userConnection.Room).SendAsync("ReceiveMessage", _botUser, $"{userConnection.User} has joined {userConnection.Room}");
+            Message joinMessage = new Message();
+            joinMessage._Id = _messages.Count;
+            joinMessage._Type = "info";
+            joinMessage._Sender = _botUser;
+            joinMessage._Content = $"{userConnection.User} has joined {userConnection.Room}";
+            joinMessage._isRead = false;
+            _messages.Add(joinMessage);
+
+            await Clients.Group(userConnection.Room).SendAsync("ReceiveMessage", joinMessage);
 
             await SendConnectedUsers(userConnection.Room);
         }
 
-        public async Task<Task> SendConnectedUsers(string room)
+        public Task SendConnectedUsers(string room)
         {
             var users = _connections.Values
                 .Where(x => x.Room == room)
@@ -63,12 +81,16 @@ namespace ChatService.Hubs
             return Clients.Group(room).SendAsync("UsersInRoom", users);
         }
 
-        public async Task<Task> MarkMessageAsRead(int id)
+        public async Task MarkMessageAsRead(int id)
         {
-            var messageToRead = _messages.Find(x => x._Id == id && !x._isRead);
-            messageToRead._isRead = true;
 
-            return Clients.All.SendAsync("MessageRead", messageToRead);
+            Message? messageToRead = _messages.Find(x => x._Id == id && !x._isRead);
+            if (messageToRead is not null)
+            {
+                messageToRead._isRead = true;
+
+                await Clients.Client(messageToRead._Sender).SendAsync("ReadMessage", id);
+            }
         }
     }
 }

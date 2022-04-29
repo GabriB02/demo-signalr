@@ -21,10 +21,16 @@ const App = () => {
         setUsers(users);
       });
 
-      //connection on o standardizzare cosa si manda come payload o cambiare il nome del metodo di ritorno in base a cosa si richiede
       connection.on('ReceiveMessage', (messageJson) => {
-        setMessages((messages) => [...messages, { ...messageJson }]);
+        setMessages((messages) => [...messages, messageJson]);
         console.log('message received: ', messageJson);
+      });
+
+      connection.on('ReadMessage', (id) => {
+        const index = messages.findIndex((x) => x._id === id);
+        messages[index]._isRead = true;
+        setMessages([...messages]);
+        console.log(`IS READ: ${messages[index]._isRead}`);
       });
 
       connection.onclose((e) => {
@@ -55,12 +61,27 @@ const App = () => {
       console.log(e);
     }
   };
+
+  const readNewMessage = async (messageId) => {
+    try {
+      await connection.invoke('MarkMessageAsRead', messageId);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
   return (
     <div className="app">
       <h2>MyChat</h2>
       <hr className="line" />
       {connection ? (
-        <Chat messages={messages} sendMessage={sendMessage} closeConnection={closeConnection} users={users} />
+        <Chat
+          messages={messages}
+          sendMessage={sendMessage}
+          closeConnection={closeConnection}
+          users={users}
+          readNewMessage={readNewMessage}
+        />
       ) : (
         <Lobby joinRoom={joinRoom} />
       )}
