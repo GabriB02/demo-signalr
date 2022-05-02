@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Lobby from './components/Lobby';
@@ -9,6 +9,7 @@ const App = () => {
   const [connection, setConnection] = useState();
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
+  const [clickedMessageId, setClickedMessageId] = useState(null);
 
   const joinRoom = async (user, room) => {
     try {
@@ -22,15 +23,12 @@ const App = () => {
       });
 
       connection.on('ReceiveMessage', (messageJson) => {
-        setMessages((messages) => [...messages, messageJson]);
-        console.log('message received: ', messageJson);
+        setMessages((oldMessages) => [...oldMessages, messageJson]);
+        console.log(`message received: ${messageJson}`);
       });
 
       connection.on('ReadMessage', (id) => {
-        const index = messages.findIndex((x) => x._id === id);
-        messages[index]._isRead = true;
-        setMessages([...messages]);
-        console.log(`IS READ: ${messages[index]._isRead}`);
+        if (!clickedMessageId) setClickedMessageId(id); //if the button is clicked
       });
 
       connection.onclose((e) => {
@@ -69,6 +67,15 @@ const App = () => {
       console.log(e);
     }
   };
+
+  useEffect(() => {
+    if (clickedMessageId) {
+      const index = messages.findIndex((x) => x._Id === clickedMessageId);
+      messages[index]['_isRead'] = true;
+      setMessages([...messages]); //re-renders the page
+      setClickedMessageId(null);
+    }
+  }, [clickedMessageId, messages]);
 
   return (
     <div className="app">

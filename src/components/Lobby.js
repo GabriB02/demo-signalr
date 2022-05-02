@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Form, Button } from 'react-bootstrap';
+import { useRecoilState } from 'recoil';
+import { userAtom, roomAtom } from '../Atoms';
 
 const Lobby = ({ joinRoom }) => {
-  const [user, setUser] = useState();
-  const [room, setRoom] = useState();
+  const [user, setUser] = useRecoilState(userAtom);
+  const [room, setRoom] = useRecoilState(roomAtom);
+
   return (
     <Form
       className="lobby"

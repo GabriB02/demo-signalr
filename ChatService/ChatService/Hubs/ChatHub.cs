@@ -1,4 +1,4 @@
-﻿using ChatService.Models;
+﻿    using ChatService.Models;
 using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 
@@ -9,16 +9,20 @@ namespace ChatService.Hubs
         private readonly string _botUser;
         private readonly IDictionary<string, UserConnection> _connections;
         private static List<Message> _messages = new List<Message>();
-
         public ChatHub(IDictionary<string, UserConnection> connections)
         {
             _botUser = "MyChat Bot";
             _connections = connections;
         }
-        //connection on o standardizzare cosa si manda come payload o cambiare il nome del metodo di ritorno in base a cosa si richiede
+
+        public string Task getConnectionId(UserConnection userConnection)
+        {
+            _connections.TryGetValue(userConnection, out Context.ConnectionId);
+        }
+
         public override Task OnDisconnectedAsync(Exception exception)
         {
-            if (_connections.TryGetValue(Context.ConnectionId, out UserConnection userConnection))
+            if (_connections.TryGetValue(Context.ConnectionId, out UserConnection? userConnection))
             {
                 _connections.Remove(Context.ConnectionId);
 
@@ -41,12 +45,14 @@ namespace ChatService.Hubs
         {
             if (_connections.TryGetValue(Context.ConnectionId, out UserConnection? userConnection))
             {
-                Message newMessage = new Message();
-                newMessage._Id = _messages.Count;
-                newMessage._Type = "normal";
-                newMessage._Sender = userConnection.User;
-                newMessage._Content = message;
-                newMessage._isRead = false;
+                Message newMessage = new()
+                {
+                    _Id = _messages.Count,
+                    _Type = "normal",
+                    _Sender = userConnection.User,
+                    _Content = message,
+                    _isRead = false
+                };
                 _messages.Add(newMessage);
 
                 await Clients.Group(userConnection.Room)
@@ -60,12 +66,14 @@ namespace ChatService.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, userConnection.Room);
             _connections[Context.ConnectionId] = userConnection;
 
-            Message joinMessage = new Message();
-            joinMessage._Id = _messages.Count;
-            joinMessage._Type = "info";
-            joinMessage._Sender = _botUser;
-            joinMessage._Content = $"{userConnection.User} has joined {userConnection.Room}";
-            joinMessage._isRead = false;
+            Message joinMessage = new()
+            {
+                _Id = _messages.Count,
+                _Type = "info",
+                _Sender = _botUser,
+                _Content = $"{userConnection.User} has joined {userConnection.Room}",
+                _isRead = false
+            };
             _messages.Add(joinMessage);
 
             await Clients.Group(userConnection.Room).SendAsync("ReceiveMessage", joinMessage);
@@ -87,9 +95,20 @@ namespace ChatService.Hubs
             Message? messageToRead = _messages.Find(x => x._Id == id && !x._isRead);
             if (messageToRead is not null)
             {
-                messageToRead._isRead = true;
+                messageToRead._Views++;
+                if (messageToRead._Views == _connections.Count)
+                {
+                    messageToRead._isRead = true;
+                    await Clients.Client()
 
-                await Clients.Client(messageToRead._Sender).SendAsync("ReadMessage", id);
+                }
+                    
+
+                await Clients.Caller.SendAsync("ReadMessage", id);
+            }
+            else
+            {
+                throw new ArgumentNullException("No message with the provided id");
             }
         }
     }
